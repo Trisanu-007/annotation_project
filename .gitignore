@@ -44,6 +44,7 @@ instance/
 # Logs
 *.log
 flask_output.log
+logs/
 
 # OS
 .DS_Store

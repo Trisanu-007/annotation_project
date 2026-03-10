@@ -9,7 +9,51 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import os
-from datetime import timedelta
+import logging
+import traceback
+from datetime import timedelta, datetime
+from logging.handlers import RotatingFileHandler
+
+# Configure logging before app initialization
+def setup_logging():
+    """Setup logging configuration with file and console handlers."""
+    # Create logs directory if it doesn't exist
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    # Create formatter with timestamp
+    formatter = logging.Formatter(
+        '[%(asctime)s] %(levelname)s in %(module)s (%(funcName)s:%(lineno)d): %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # File handler - rotates at 10MB, keeps 10 backup files
+    file_handler = RotatingFileHandler(
+        'logs/app.log',
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=10
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Get the root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    return root_logger
+
+# Initialize logging
+logger = setup_logging()
+logger.info("=" * 80)
+logger.info("Application starting up...")
+logger.info("=" * 80)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
@@ -17,7 +61,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
+logger.info(f"SECRET_KEY configured: {'***' if app.config['SECRET_KEY'] else 'NOT SET'}")
+logger.info(f"Database URI: {app.config['SQLALCHEMY_DATABASE_URI']}")
+
 db = SQLAlchemy(app)
+logger.info("SQLAlchemy initialized")
 
 # User model
 class User(db.Model):
@@ -45,8 +93,16 @@ class Answer(db.Model):
     __table_args__ = (db.UniqueConstraint('user_id', 'sample_index', name='_user_sample_uc'),)
 
 # Initialize database
-with app.app_context():
-    db.create_all()
+logger.info("Initializing database...")
+try:
+    with app.app_context():
+        db.create_all()
+        user_count = User.query.count()
+        admin_count = User.query.filter_by(is_admin=True).count()
+        logger.info(f"Database initialized successfully. Users: {user_count}, Admins: {admin_count}")
+except Exception as e:
+    logger.error(f"Database initialization failed: {str(e)}")
+    logger.error(traceback.format_exc())
 
 def get_user_data(user_number):
     """Load user-specific data from their JSON file."""
@@ -70,28 +126,46 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        user = User.query.filter_by(username=username).first()
+        logger.info(f"Login attempt for username: {username} from IP: {request.remote_addr}")
         
-        if user and user.check_password(password):
-            session.permanent = True
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['user_number'] = user.user_number
-            session['is_admin'] = user.is_admin
+        try:
+            user = User.query.filter_by(username=username).first()
             
-            # Redirect admin to admin dashboard
-            if user.is_admin:
-                return redirect(url_for('admin_dashboard'))
+            if not user:
+                logger.warning(f"Login failed: User '{username}' not found in database")
+                return render_template('login.html', error='Invalid username or password')
+            
+            logger.debug(f"User found: ID={user.id}, is_admin={user.is_admin}, user_number={user.user_number}")
+            
+            if user.check_password(password):
+                session.permanent = True
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['user_number'] = user.user_number
+                session['is_admin'] = user.is_admin
+                
+                logger.info(f"Login successful for user: {username} (ID: {user.id}, Admin: {user.is_admin})")
+                
+                # Redirect admin to admin dashboard
+                if user.is_admin:
+                    return redirect(url_for('admin_dashboard'))
+                else:
+                    return redirect(url_for('dashboard'))
             else:
-                return redirect(url_for('dashboard'))
-        else:
-            return render_template('login.html', error='Invalid username or password')
+                logger.warning(f"Login failed: Invalid password for user '{username}'")
+                return render_template('login.html', error='Invalid username or password')
+        except Exception as e:
+            logger.error(f"Exception during login for username '{username}': {str(e)}")
+            logger.error(traceback.format_exc())
+            return render_template('login.html', error='An error occurred. Please try again.')
     
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     """Logout handler."""
+    username = session.get('username', 'Unknown')
+    logger.info(f"User {username} logged out")
     session.clear()
     return redirect(url_for('login'))
 
@@ -240,65 +314,97 @@ def api_data():
 def admin_dashboard():
     """Admin dashboard - shows all users and their progress."""
     if 'user_id' not in session or not session.get('is_admin'):
+        logger.warning(f"Unauthorized access attempt to admin dashboard from {request.remote_addr}")
         return redirect(url_for('login'))
     
-    # Get all non-admin users
-    users = User.query.filter_by(is_admin=False).order_by(User.user_number).all()
+    try:
+        admin_username = session.get('username')
+        logger.info(f"Admin {admin_username} accessing dashboard")
     
-    # Get progress for each user
-    user_progress = []
-    for user in users:
-        answers_count = Answer.query.filter_by(user_id=user.id).count()
-        user_data = get_user_data(user.user_number)
-        total_samples = len(user_data) if user_data else 0
+        # Get all non-admin users
+        users = User.query.filter_by(is_admin=False).order_by(User.user_number).all()
+        logger.debug(f"Found {len(users)} regular users")
+    
+        # Get progress for each user
+        user_progress = []
+        for user in users:
+            answers_count = Answer.query.filter_by(user_id=user.id).count()
+            user_data = get_user_data(user.user_number)
+            total_samples = len(user_data) if user_data else 0
+            
+            user_progress.append({
+                'id': user.id,
+                'username': user.username,
+                'user_number': user.user_number,
+                'answered': answers_count,
+                'total': total_samples,
+                'progress_percent': round((answers_count / total_samples * 100) if total_samples > 0 else 0, 1)
+            })
         
-        user_progress.append({
-            'id': user.id,
-            'username': user.username,
-            'user_number': user.user_number,
-            'answered': answers_count,
-            'total': total_samples,
-            'progress_percent': round((answers_count / total_samples * 100) if total_samples > 0 else 0, 1)
-        })
-    
-    return render_template('admin_dashboard.html', 
-                         username=session.get('username'),
-                         users=user_progress)
+        logger.debug(f"Rendering admin dashboard with {len(user_progress)} users")
+        
+        return render_template('admin_dashboard.html',
+                             admin_username=admin_username,
+                             users=user_progress)
+    except Exception as e:
+        logger.error(f"Error in admin dashboard: {str(e)}")
+        logger.error(traceback.format_exc())
+        return "An error occurred", 500
 
 @app.route('/admin/user/<int:user_id>')
 def admin_view_user(user_id):
     """Admin view - shows detailed progress for a specific user."""
     if 'user_id' not in session or not session.get('is_admin'):
+        logger.warning(f"Unauthorized access attempt to view user {user_id} from {request.remote_addr}")
         return redirect(url_for('login'))
     
-    user = User.query.get_or_404(user_id)
-    
-    if user.is_admin:
-        return "Cannot view admin users", 403
-    
-    # Get all answers for this user
-    answers = Answer.query.filter_by(user_id=user_id).all()
-    answer_map = {ans.sample_index: ans.answer for ans in answers}
-    
-    # Get user data
-    user_data = get_user_data(user.user_number)
-    
-    # Build detailed progress
-    samples_with_answers = []
-    for idx, sample in enumerate(user_data):
-        samples_with_answers.append({
-            'index': idx,
-            'answer': answer_map.get(idx, 'Not answered'),
-            'question_preview': sample.get('Question', '')[:100] + '...' if len(sample.get('Question', '')) > 100 else sample.get('Question', '')
-        })
-    
-    return render_template('admin_user_detail.html',
-                         admin_username=session.get('username'),
-                         user=user,
-                         samples=samples_with_answers,
-                         total_samples=len(user_data),
-                         answered_count=len(answer_map))
+    try:
+        admin_username = session.get('username')
+        logger.info(f"Admin {admin_username} viewing user ID {user_id}")
+        
+        user = User.query.get_or_404(user_id)
+        
+        if user.is_admin:
+            logger.warning(f"Admin {admin_username} attempted to view another admin user")
+            return "Cannot view admin users", 403
+        
+        # Get all answers for this user
+        answers = Answer.query.filter_by(user_id=user_id).all()
+        answer_map = {ans.sample_index: ans.answer for ans in answers}
+        
+        # Get user data
+        user_data = get_user_data(user.user_number)
+        
+        logger.debug(f"User {user.username}: {len(answer_map)}/{len(user_data)} answers")
+        
+        # Build detailed progress
+        samples_with_answers = []
+        for idx, sample in enumerate(user_data):
+            samples_with_answers.append({
+                'index': idx,
+                'answer': answer_map.get(idx, 'Not answered'),
+                'question_preview': sample.get('Question', '')[:100] + '...' if len(sample.get('Question', '')) > 100 else sample.get('Question', '')
+            })
+        
+        return render_template('admin_user_detail.html',
+                             admin_username=session.get('username'),
+                             user=user,
+                             samples=samples_with_answers,
+                             total_samples=len(user_data),
+                             answered_count=len(answer_map))
+    except Exception as e:
+        logger.error(f"Error viewing user {user_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return "An error occurred", 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5001))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    try:
+        port = int(os.environ.get('PORT', 5001))
+        logger.info(f"Starting Flask application on port {port}")
+        logger.info(f"Debug mode: {True}")
+        logger.info(f"Host: 0.0.0.0")
+        app.run(debug=True, host='0.0.0.0', port=port)
+    except Exception as e:
+        logger.critical(f"Failed to start application: {str(e)}")
+        logger.critical(traceback.format_exc())
+        raise
