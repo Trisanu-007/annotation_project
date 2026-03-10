@@ -100,6 +100,35 @@ try:
         user_count = User.query.count()
         admin_count = User.query.filter_by(is_admin=True).count()
         logger.info(f"Database initialized successfully. Users: {user_count}, Admins: {admin_count}")
+        
+        # Auto-create users and admin if database is empty
+        if user_count == 0:
+            logger.info("Database is empty. Creating default users and admin...")
+            
+            # Create 10 regular users
+            for i in range(1, 11):
+                username = f'user{i}'
+                password = f'password{i}'
+                
+                user = User(username=username, user_number=i, is_admin=False)
+                user.set_password(password)
+                db.session.add(user)
+                logger.info(f"Created user: {username}")
+            
+            # Create admin user
+            admin = User(username='admin', user_number=None, is_admin=True)
+            admin.set_password('admin123')
+            db.session.add(admin)
+            logger.info("Created admin user")
+            
+            db.session.commit()
+            
+            final_user_count = User.query.count()
+            final_admin_count = User.query.filter_by(is_admin=True).count()
+            logger.info(f"✓ Auto-initialization complete! Users: {final_user_count}, Admins: {final_admin_count}")
+        else:
+            logger.info("Users already exist, skipping auto-initialization")
+            
 except Exception as e:
     logger.error(f"Database initialization failed: {str(e)}")
     logger.error(traceback.format_exc())
