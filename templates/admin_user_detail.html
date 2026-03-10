@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details - {{ user.username }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+        }
+        
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .back-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .user-info-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-info-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+        
+        .info-row {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .info-label {
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        .progress-summary {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .progress-bar-container {
+            background: #e0e0e0;
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 10px;
+        }
+        
+        .progress-bar-fill {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .answers-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .answers-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #f8f9fa;
+        }
+        
+        th {
+            text-align: left;
+            padding: 14px;
+            font-weight: 600;
+            color: #555;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        td {
+            padding: 14px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .answer-badge {
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+        }
+        
+        .answer-yes {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .answer-no {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .answer-pending {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .question-preview {
+            color: #666;
+            font-size: 14px;
+            max-width: 600px;
+        }
+        
+        .filter-buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .filter-btn:hover, .filter-btn.active {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>👤 User Details: {{ user.username }}</h1>
+            <div class="header-info">
+                <a href="{{ url_for('admin_dashboard') }}" class="back-btn">← Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="user-info-card">
+            <h2>User Information</h2>
+            <div class="info-row">
+                <div class="info-item">
+                    <span class="info-label">Username:</span>
+                    <span class="info-value">{{ user.username }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">User Number:</span>
+                    <span class="info-value">#{{ user.user_number }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Current Position:</span>
+                    <span class="info-value">Sample {{ user.current_index + 1 }} of {{ total_samples }}</span>
+                </div>
+            </div>
+            
+            <div class="progress-summary">
+                <div class="info-row">
+                    <div class="info-item">
+                        <span class="info-label">Answered:</span>
+                        <span class="info-value">{{ answered_count }} / {{ total_samples }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Progress:</span>
+                        <span class="info-value">{{ "%.1f"|format((answered_count / total_samples * 100) if total_samples > 0 else 0) }}%</span>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" style="width: {{ (answered_count / total_samples * 100) if total_samples > 0 else 0 }}%;">
+                        {{ "%.1f"|format((answered_count / total_samples * 100) if total_samples > 0 else 0) }}%
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="answers-card">
+            <h2>Answer Details</h2>
+            
+            <div class="filter-buttons">
+                <button class="filter-btn active" onclick="filterAnswers('all')">All ({{ total_samples }})</button>
+                <button class="filter-btn" onclick="filterAnswers('yes')">Yes ({{ samples|selectattr('answer', 'equalto', 'Yes')|list|length }})</button>
+                <button class="filter-btn" onclick="filterAnswers('no')">No ({{ samples|selectattr('answer', 'equalto', 'No')|list|length }})</button>
+                <button class="filter-btn" onclick="filterAnswers('pending')">Not Answered ({{ samples|selectattr('answer', 'equalto', 'Not answered')|list|length }})</button>
+            </div>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Sample #</th>
+                        <th style="width: 120px;">Answer</th>
+                        <th>Question Preview</th>
+                    </tr>
+                </thead>
+                <tbody id="answers-table-body">
+                    {% for sample in samples %}
+                    <tr data-answer="{{ sample.answer }}">
+                        <td><strong>{{ sample.index + 1 }}</strong></td>
+                        <td>
+                            {% if sample.answer == 'Yes' %}
+                                <span class="answer-badge answer-yes">✓ Yes</span>
+                            {% elif sample.answer == 'No' %}
+                                <span class="answer-badge answer-no">✗ No</span>
+                            {% else %}
+                                <span class="answer-badge answer-pending">— Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="question-preview">{{ sample.question_preview }}</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        function filterAnswers(filter) {
+            const rows = document.querySelectorAll('#answers-table-body tr');
+            const buttons = document.querySelectorAll('.filter-btn');
+            
+            // Update active button
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Filter rows
+            rows.forEach(row => {
+                const answer = row.getAttribute('data-answer');
+                
+                if (filter === 'all') {
+                    row.style.display = '';
+                } else if (filter === 'yes' && answer === 'Yes') {
+                    row.style.display = '';
+                } else if (filter === 'no' && answer === 'No') {
+                    row.style.display = '';
+                } else if (filter === 'pending' && answer === 'Not answered') {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

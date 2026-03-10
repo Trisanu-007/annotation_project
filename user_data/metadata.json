@@ -1,0 +1,57 @@
+{
+  "num_users": 10,
+  "samples_per_user": 20,
+  "total_samples": 200,
+  "user_assignments": {
+    "user_1": {
+      "file": "user_1_data.json",
+      "start_idx": 0,
+      "end_idx": 20
+    },
+    "user_2": {
+      "file": "user_2_data.json",
+      "start_idx": 20,
+      "end_idx": 40
+    },
+    "user_3": {
+      "file": "user_3_data.json",
+      "start_idx": 40,
+      "end_idx": 60
+    },
+    "user_4": {
+      "file": "user_4_data.json",
+      "start_idx": 60,
+      "end_idx": 80
+    },
+    "user_5": {
+      "file": "user_5_data.json",
+      "start_idx": 80,
+      "end_idx": 100
+    },
+    "user_6": {
+      "file": "user_6_data.json",
+      "start_idx": 100,
+      "end_idx": 120
+    },
+    "user_7": {
+      "file": "user_7_data.json",
+      "start_idx": 120,
+      "end_idx": 140
+    },
+    "user_8": {
+      "file": "user_8_data.json",
+      "start_idx": 140,
+      "end_idx": 160
+    },
+    "user_9": {
+      "file": "user_9_data.json",
+      "start_idx": 160,
+      "end_idx": 180
+    },
+    "user_10": {
+      "file": "user_10_data.json",
+      "start_idx": 180,
+      "end_idx": 200
+    }
+  }
+}
