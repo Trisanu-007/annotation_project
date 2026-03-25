@@ -4,8 +4,9 @@ Flask web application with user authentication and session management.
 Serves non-overlapping data samples to authenticated users.
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import os
@@ -57,7 +58,10 @@ logger.info("=" * 80)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+database_url = os.environ.get('DATABASE_URL')
+if not database_url:
+    raise RuntimeError('DATABASE_URL is required. Configure your external Render Postgres URL.')
+
 if database_url.startswith('postgres://'):
     # Railway/Heroku sometimes provide postgres://, SQLAlchemy expects postgresql://
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -119,41 +123,14 @@ try:
         user_count = User.query.count()
         admin_count = User.query.filter_by(is_admin=True).count()
         logger.info(f"Database initialized successfully. Users: {user_count}, Admins: {admin_count}")
-        
-        # Auto-create users and admin if database is empty
-        if user_count == 0:
-            logger.info("Database is empty. Creating default users and admin...")
-            
-            # Create 10 regular users
-            for i in range(1, 11):
-                username = f'user{i}'
-                password = f'password{i}'
-                
-                user = User(username=username, user_number=i, is_admin=False)
-                user.set_password(password)
-                db.session.add(user)
-                logger.info(f"Created user: {username}")
-            
-            # Create admin user
-            admin = User(username='admin', user_number=None, is_admin=True)
-            admin.set_password('admin123')
-            db.session.add(admin)
-            logger.info("Created admin user")
-            
-            db.session.commit()
-            
-            final_user_count = User.query.count()
-            final_admin_count = User.query.filter_by(is_admin=True).count()
-            logger.info(f"✓ Auto-initialization complete! Users: {final_user_count}, Admins: {final_admin_count}")
-        else:
-            logger.info("Users already exist, skipping auto-initialization")
+        logger.info("Auto user/admin creation is disabled at app startup")
             
 except Exception as e:
     logger.error(f"Database initialization failed: {str(e)}")
     logger.error(traceback.format_exc())
 
 def get_user_data(user_number):
-    """Load user-specific data from database, fallback to JSON file."""
+    """Load user-specific data from database only."""
     db_samples = AnnotationSample.query.filter_by(user_number=user_number).order_by(AnnotationSample.sample_index).all()
     if db_samples:
         records = []
@@ -169,10 +146,6 @@ def get_user_data(user_number):
             records.append(row)
         return records
 
-    data_file = os.path.join('user_data', f'user_{user_number}_data.json')
-    if os.path.exists(data_file):
-        with open(data_file, 'r') as f:
-            return json.load(f)
     return []
 
 @app.route('/')
@@ -182,21 +155,48 @@ def index():
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render and other uptime probes."""
+    db_status = 'ok'
+    status_code = 200
+
+    try:
+        db.session.execute(text('SELECT 1'))
+    except Exception as e:
+        db_status = 'error'
+        status_code = 503
+        logger.error(f"Health check DB probe failed: {str(e)}")
+
+    return jsonify({
+        'status': 'ok' if status_code == 200 else 'degraded',
+        'database': db_status,
+        'timestamp': datetime.utcnow().isoformat() + 'Z'
+    }), status_code
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page and authentication handler."""
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username = (request.form.get('username') or '').strip()
+        password = request.form.get('password') or ''
         
         logger.info(f"Login attempt for username: {username} from IP: {request.remote_addr}")
+
+        if not username:
+            logger.warning("Login failed: Username is missing")
+            return render_template('login.html', error='Username is required.')
+
+        if not password:
+            logger.warning(f"Login failed: Password is missing for user '{username}'")
+            return render_template('login.html', error='Password is required.')
         
         try:
             user = User.query.filter_by(username=username).first()
             
             if not user:
                 logger.warning(f"Login failed: User '{username}' not found in database")
-                return render_template('login.html', error='Invalid username or password')
+                return render_template('login.html', error=f"User '{username}' was not found.")
             
             logger.debug(f"User found: ID={user.id}, is_admin={user.is_admin}, user_number={user.user_number}")
             
@@ -216,11 +216,11 @@ def login():
                     return redirect(url_for('dashboard'))
             else:
                 logger.warning(f"Login failed: Invalid password for user '{username}'")
-                return render_template('login.html', error='Invalid username or password')
+                return render_template('login.html', error='Incorrect password. Please try again.')
         except Exception as e:
             logger.error(f"Exception during login for username '{username}': {str(e)}")
             logger.error(traceback.format_exc())
-            return render_template('login.html', error='An error occurred. Please try again.')
+            return render_template('login.html', error='Login failed due to a server error. Please try again.')
     
     return render_template('login.html')
 
@@ -459,6 +459,59 @@ def admin_view_user(user_id):
         logger.error(f"Error viewing user {user_id}: {str(e)}")
         logger.error(traceback.format_exc())
         return "An error occurred", 500
+
+@app.route('/admin/user/<int:user_id>/download')
+def admin_download_user_annotations(user_id):
+    """Admin-only JSON download for a user's annotations."""
+    if 'user_id' not in session or not session.get('is_admin'):
+        logger.warning(f"Unauthorized download attempt for user {user_id} from {request.remote_addr}")
+        return redirect(url_for('login'))
+
+    try:
+        admin_username = session.get('username')
+        user = User.query.get_or_404(user_id)
+
+        if user.is_admin:
+            logger.warning(f"Admin {admin_username} attempted to download admin user data")
+            return "Cannot download admin user data", 403
+
+        answers = Answer.query.filter_by(user_id=user_id).all()
+        answer_map = {ans.sample_index: ans.answer for ans in answers}
+        user_data = get_user_data(user.user_number)
+
+        annotations = []
+
+        for idx, sample in enumerate(user_data):
+            answer = answer_map.get(idx, '')
+            status = 'answered' if answer else 'not_answered'
+            annotations.append({
+                'sample_index': idx,
+                'answer': answer,
+                'status': status,
+                'sample': sample,
+            })
+
+        payload = {
+            'username': user.username,
+            'user_number': user.user_number,
+            'total_samples': len(user_data),
+            'answered_count': len(answer_map),
+            'exported_at': datetime.utcnow().isoformat() + 'Z',
+            'annotations': annotations,
+        }
+
+        filename = f"annotations_{user.username}.json"
+        logger.info(f"Admin {admin_username} downloaded annotations for {user.username}")
+
+        return Response(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            mimetype='application/json',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+    except Exception as e:
+        logger.error(f"Error downloading annotations for user {user_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return "An error occurred while preparing download", 500
 
 if __name__ == '__main__':
     try:

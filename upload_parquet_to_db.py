@@ -15,8 +15,8 @@ import os
 
 
 def get_app_objects():
-    from app import app, db, AnnotationSample
-    return app, db, AnnotationSample
+    from app import app, db, AnnotationSample, Answer
+    return app, db, AnnotationSample, Answer
 
 
 def upsert_samples(
@@ -25,9 +25,10 @@ def upsert_samples(
     samples_per_user=20,
     start_row=0,
     replace_existing=False,
+    clear_answers=False,
 ):
     pq = importlib.import_module("pyarrow.parquet")
-    app, db, AnnotationSample = get_app_objects()
+    app, db, AnnotationSample, Answer = get_app_objects()
 
     db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
     print(f"Using database: {db_uri}")
@@ -51,6 +52,10 @@ def upsert_samples(
         if replace_existing:
             deleted = AnnotationSample.query.delete()
             print(f"Deleted {deleted} existing samples before import")
+        
+        if clear_answers:
+            deleted = Answer.query.delete()
+            print(f"Deleted {deleted} user answers before import")
 
         for user_number in range(1, num_users + 1):
             base = (user_number - 1) * samples_per_user
@@ -115,6 +120,11 @@ def main():
         action="store_true",
         help="Delete existing annotation_sample rows before import",
     )
+    parser.add_argument(
+        "--clear-answers",
+        action="store_true",
+        help="Delete all user answers before import (starts fresh)",
+    )
 
     args = parser.parse_args()
 
@@ -127,6 +137,7 @@ def main():
         samples_per_user=args.samples_per_user,
         start_row=args.start_row,
         replace_existing=args.replace_existing,
+        clear_answers=args.clear_answers,
     )
 
 

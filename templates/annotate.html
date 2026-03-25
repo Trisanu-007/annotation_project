@@ -437,6 +437,8 @@
         }
         
         function selectAnswer(answer) {
+            const selectedIndex = currentIndex;
+
             // Update UI
             document.querySelectorAll('.option-card').forEach(card => {
                 card.classList.remove('selected');
@@ -451,7 +453,7 @@
             }
             
             // Save answer
-            saveAnswer(answer);
+            saveAnswer(answer, selectedIndex);
             
             // Auto-navigate to next page after a short delay
             setTimeout(() => {
@@ -461,7 +463,7 @@
             }, 500);
         }
         
-        function saveAnswer(answer) {
+        function saveAnswer(answer, indexToSave) {
             const statusEl = document.getElementById('save-status');
             statusEl.textContent = 'Saving...';
             statusEl.className = 'save-status saving';
@@ -479,25 +481,33 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        index: currentIndex,
+                        index: indexToSave,
                         answer: answer
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        answerMap[currentIndex.toString()] = answer;
-                        statusEl.textContent = 'Saved: ' + answer;
-                        statusEl.className = 'save-status saved';
+                        answerMap[indexToSave.toString()] = answer;
+
+                        if (currentIndex === indexToSave) {
+                            statusEl.textContent = 'Saved: ' + answer;
+                            statusEl.className = 'save-status saved';
+                        }
+
                         updateProgress();
                     } else {
-                        statusEl.textContent = 'Error saving answer';
-                        statusEl.className = 'save-status';
+                        if (currentIndex === indexToSave) {
+                            statusEl.textContent = 'Error saving answer';
+                            statusEl.className = 'save-status';
+                        }
                     }
                 })
                 .catch(error => {
-                    statusEl.textContent = 'Error: ' + error.message;
-                    statusEl.className = 'save-status';
+                    if (currentIndex === indexToSave) {
+                        statusEl.textContent = 'Error: ' + error.message;
+                        statusEl.className = 'save-status';
+                    }
                 });
             }, 300);
         }
