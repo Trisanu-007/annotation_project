@@ -302,10 +302,14 @@ def get_sample(index):
                 if 'Facts:' in facts_part:
                     facts = facts_part.split('Facts:')[1].strip()
         
+        # Extract Predicted Proof Chain
+        predicted_proof_chain = sample.get('Predicted_Proof_Chain', '')
+        
         return jsonify({
             'index': index,
             'facts': facts,
             'query': query,
+            'predicted_proof_chain': predicted_proof_chain,
             'total': len(user_data)
         })
     else:
