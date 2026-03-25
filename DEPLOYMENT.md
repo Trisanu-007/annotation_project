@@ -13,11 +13,20 @@
 3. **Configure**
    - Railway auto-detects Flask
    - It will use `Procfile` automatically
-   - Database persists in volume
+   - Add a **Postgres** service and attach it to the app
+   - Railway will provide `DATABASE_URL`
 
 4. **Deploy**
    - Push to GitHub → Auto-deploys
    - Get your URL: `yourapp.railway.app`
+
+5. **Load Dataset into Postgres (Important)**
+   - Open Railway shell for your app service
+   - Run:
+   ```bash
+   python upload_parquet_to_db.py alice_test_depth0-50_complete.parquet --num-users 10 --samples-per-user 20
+   ```
+   - The web app will now read samples from Postgres and survive redeploys.
 
 ## Option 2: Heroku (GitHub Student Pack)
 

@@ -57,8 +57,14 @@ logger.info("=" * 80)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-this-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///users.db')
+if database_url.startswith('postgres://'):
+    # Railway/Heroku sometimes provide postgres://, SQLAlchemy expects postgresql://
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 logger.info(f"SECRET_KEY configured: {'***' if app.config['SECRET_KEY'] else 'NOT SET'}")
@@ -91,6 +97,19 @@ class Answer(db.Model):
     
     # Composite unique constraint: one answer per user per sample
     __table_args__ = (db.UniqueConstraint('user_id', 'sample_index', name='_user_sample_uc'),)
+
+
+# Model to store annotation samples per user in the database
+class AnnotationSample(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_number = db.Column(db.Integer, nullable=False, index=True)
+    sample_index = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.Text, nullable=True)
+    payload = db.Column(db.JSON, nullable=True)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_number', 'sample_index', name='_user_sample_index_uc'),
+    )
 
 # Initialize database
 logger.info("Initializing database...")
@@ -134,7 +153,22 @@ except Exception as e:
     logger.error(traceback.format_exc())
 
 def get_user_data(user_number):
-    """Load user-specific data from their JSON file."""
+    """Load user-specific data from database, fallback to JSON file."""
+    db_samples = AnnotationSample.query.filter_by(user_number=user_number).order_by(AnnotationSample.sample_index).all()
+    if db_samples:
+        records = []
+        for sample in db_samples:
+            if isinstance(sample.payload, dict):
+                row = dict(sample.payload)
+            else:
+                row = {}
+
+            if 'Question' not in row and sample.question:
+                row['Question'] = sample.question
+
+            records.append(row)
+        return records
+
     data_file = os.path.join('user_data', f'user_{user_number}_data.json')
     if os.path.exists(data_file):
         with open(data_file, 'r') as f:

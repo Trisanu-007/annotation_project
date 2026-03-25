@@ -36,6 +36,23 @@ python3 app.py
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
+## Railway Postgres Setup (Recommended)
+
+Use Railway Postgres so your dataset survives redeploys.
+
+1. Add a Postgres service in Railway and attach it to this app.
+2. Ensure app environment has:
+	- `DATABASE_URL` (automatically provided by Railway when Postgres is attached)
+	- `SECRET_KEY` (set your own strong value)
+3. Deploy once so tables are created.
+4. Import parquet data into DB:
+
+```bash
+python upload_parquet_to_db.py alice_test_depth0-50_complete.parquet --num-users 10 --samples-per-user 20
+```
+
+After this import, the website reads samples from the database instead of local JSON files.
+
 ## Project Structure
 
 ```
@@ -113,7 +130,7 @@ The application will be available at: **http://localhost:5000**
 - **Total samples**: 200 (from parquet file with 2550 rows)
 - **Per user**: 20 non-overlapping samples
 - **Users**: 10 accounts
-- Each user's data is stored in a separate JSON file
+- Each user's data can be stored in PostgreSQL (`annotation_sample` table)
 - Metadata tracking for user assignments
 
 ### API Endpoints
