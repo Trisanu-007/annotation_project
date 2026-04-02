@@ -1,0 +1,11 @@
+This page shows the admin overview for all non-admin users.
+
+What you can do here:
+- Review each user's progress at a glance.
+- Click View Details to inspect a user's answers one by one.
+- Click Download to export that user's annotations.
+- Use the progress column to see how many samples are complete.
+
+Help panel controls:
+- Click the ? button to open this help panel.
+- Click x to close it after you are done reading.

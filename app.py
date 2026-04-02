@@ -148,6 +148,17 @@ def get_user_data(user_number):
 
     return []
 
+def load_instructions_text():
+    """Load help text from instructions.txt in the project root."""
+    instructions_path = os.path.join(app.root_path, 'instructions.txt')
+
+    try:
+        with open(instructions_path, 'r', encoding='utf-8') as instructions_file:
+            return instructions_file.read().strip()
+    except FileNotFoundError:
+        logger.warning(f"instructions.txt not found at {instructions_path}")
+        return 'Help text is unavailable because instructions.txt is missing.'
+
 @app.route('/')
 def index():
     """Home page - redirect to login if not authenticated."""
@@ -275,7 +286,8 @@ def annotate():
                          user_number=user_number,
                          current_index=current_index,
                          total_samples=total_samples,
-                         answer_map=answer_map)
+                         answer_map=answer_map,
+                         help_text=load_instructions_text())
 
 @app.route('/api/sample/<int:index>')
 def get_sample(index):

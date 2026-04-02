@@ -40,6 +40,86 @@
             display: flex;
             align-items: center;
             gap: 20px;
+            position: relative;
+        }
+
+        .help-wrap {
+            position: relative;
+        }
+
+        .help-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.16);
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .help-btn:hover {
+            background: rgba(255, 255, 255, 0.28);
+            transform: translateY(-1px);
+        }
+
+        .help-panel {
+            position: absolute;
+            top: 48px;
+            right: 0;
+            width: min(420px, calc(100vw - 40px));
+            background: white;
+            color: #2f2f2f;
+            border-radius: 14px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(102, 126, 234, 0.15);
+            padding: 18px;
+            z-index: 20;
+        }
+
+        .help-panel[hidden] {
+            display: none;
+        }
+
+        .help-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .help-panel-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .help-close {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 50%;
+            background: #eef2ff;
+            color: #4b5563;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .help-close:hover {
+            background: #e0e7ff;
+            color: #111827;
+        }
+
+        .help-panel-body {
+            white-space: pre-wrap;
+            line-height: 1.65;
+            color: #374151;
+            font-size: 14px;
         }
         
         .logout-btn {
@@ -278,6 +358,16 @@
         <div class="header-content">
             <h1>Annotation Project</h1>
             <div class="user-info">
+                <div class="help-wrap">
+                    <button type="button" class="help-btn" id="help-toggle" aria-expanded="false" aria-controls="help-panel">?</button>
+                    <div class="help-panel" id="help-panel" hidden>
+                        <div class="help-panel-header">
+                            <span class="help-panel-title">Help</span>
+                            <button type="button" class="help-close" id="help-close" aria-label="Close help">x</button>
+                        </div>
+                        <div class="help-panel-body" id="help-panel-body"></div>
+                    </div>
+                </div>
                 <span>{{ username }}</span>
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
             </div>
@@ -309,7 +399,38 @@
         let currentIndex = {{ current_index }};
         const totalSamples = {{ total_samples }};
         const answerMap = {{ answer_map|tojson }};
+        const helpText = {{ help_text | tojson }};
         let saveTimeout = null;
+
+        const helpToggle = document.getElementById('help-toggle');
+        const helpPanel = document.getElementById('help-panel');
+        const helpClose = document.getElementById('help-close');
+        const helpPanelBody = document.getElementById('help-panel-body');
+
+        helpPanelBody.textContent = helpText;
+
+        function setHelpOpen(isOpen) {
+            helpPanel.hidden = !isOpen;
+            helpToggle.setAttribute('aria-expanded', String(isOpen));
+        }
+
+        helpToggle.addEventListener('click', () => {
+            setHelpOpen(helpPanel.hidden);
+        });
+
+        helpClose.addEventListener('click', () => {
+            setHelpOpen(false);
+        });
+
+        document.addEventListener('click', (event) => {
+            if (helpPanel.hidden) {
+                return;
+            }
+
+            if (!helpPanel.contains(event.target) && !helpToggle.contains(event.target)) {
+                setHelpOpen(false);
+            }
+        });
         
         function updateProgress() {
             const answeredCount = Object.keys(answerMap).length;
