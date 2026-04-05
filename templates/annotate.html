@@ -218,6 +218,27 @@
             font-weight: bold;
             font-size: 1.1em;
         }
+
+        .proof-layout {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        .proof-layout .section {
+            margin-bottom: 0;
+        }
+
+        .proof-layout .section-content {
+            height: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .proof-layout {
+                grid-template-columns: 1fr;
+            }
+        }
         
         .query-content {
             border-left-color: #764ba2;
@@ -559,21 +580,25 @@
                             <div class="section-content">${formatText(initialFacts, true)}</div>
                         </div>
                         
-                        <div class="section rules-dropdown">
-                            <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Rules</button>
-                            <div class="rules-content" hidden>
-                                <div class="section-content">${formatText(rules)}</div>
+                        <div class="proof-layout">
+                            <div class="section rules-dropdown">
+                                <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Rules</button>
+                                <div class="rules-content" hidden>
+                                    <div class="section-content">${formatText(rules)}</div>
+                                </div>
+                            </div>
+
+                            <div class="section rules-dropdown">
+                                <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Predicted Proof Chain</button>
+                                <div class="rules-content" hidden>
+                                    <div class="section-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <div class="section">
                             <div class="section-title">Query</div>
                             <div class="section-content query-content">${formatText(data.query)}</div>
-                        </div>
-                        
-                        <div class="section">
-                            <div class="section-title">Predicted Proof Chain</div>
-                            <div class="section-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
                         </div>
                         
                         <div class="answer-section">

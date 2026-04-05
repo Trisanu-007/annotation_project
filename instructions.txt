@@ -1,3 +1,9 @@
 Instructions:
 
 Please make sure that you check the given Facts and Rules and check if the Predicted Proof Chain answers the Query.
+
+Make sure that:
+1. If the query is reachable by the predicted proof chain, mark "yes".
+2. Soft check if the predicted proof chain contains hallucinated chains. Even if it does, there is a possibility that the total proof chain does answer the given query. In that case mark "Yes".
+3. Make sure the Predicted Proof chain actually helps in answering the query.
+4. If the query is not reachable due to either mistakes in predicted proof chain or the proof chain itself does not lead to reaching the query or the proof chain contains statement like "cannot apply rule" which could imply the rule is not applicable, then answer "no"
