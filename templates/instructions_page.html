@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f8f9ff 0%, #eef2ff 100%);
+            color: #1f2937;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            gap: 12px;
+        }
+
+        .welcome {
+            font-size: 16px;
+            color: #374151;
+        }
+
+        .logout-btn {
+            display: inline-block;
+            text-decoration: none;
+            background: #e5e7eb;
+            color: #1f2937;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1px solid #dbe4ff;
+            box-shadow: 0 8px 24px rgba(66, 83, 153, 0.12);
+            padding: 24px;
+        }
+
+        .title {
+            font-size: 26px;
+            margin-bottom: 8px;
+            color: #1d4ed8;
+        }
+
+        .subtitle {
+            color: #4b5563;
+            margin-bottom: 16px;
+        }
+
+        .instructions {
+            white-space: pre-wrap;
+            line-height: 1.65;
+            background: #f8fafc;
+            border: 1px solid #dbe4ff;
+            border-radius: 10px;
+            padding: 16px;
+            max-height: 65vh;
+            overflow: auto;
+            font-size: 15px;
+        }
+
+        .actions {
+            margin-top: 18px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .continue-btn {
+            border: none;
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+        }
+
+        .continue-btn:hover {
+            filter: brightness(1.05);
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 14px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .title {
+                font-size: 22px;
+            }
+
+            .actions {
+                justify-content: stretch;
+            }
+
+            .continue-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="welcome">Logged in as {{ username }}</div>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+
+        <div class="card">
+            <h1 class="title">Instructions</h1>
+            <p class="subtitle">Please read the instructions before starting annotation.</p>
+
+            <div class="instructions">{{ help_text }}</div>
+
+            <form method="POST" class="actions">
+                <button type="submit" class="continue-btn">Continue to Annotation</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

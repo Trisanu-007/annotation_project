@@ -6,7 +6,7 @@ Serves non-overlapping data samples to authenticated users.
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import os
@@ -98,6 +98,7 @@ class Answer(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     sample_index = db.Column(db.Integer, nullable=False)  # Index in user's data array
     answer = db.Column(db.String(10))  # "Yes" or "No"
+    notes = db.Column(db.Text)  # Optional annotator notes
     
     # Composite unique constraint: one answer per user per sample
     __table_args__ = (db.UniqueConstraint('user_id', 'sample_index', name='_user_sample_uc'),)
@@ -115,11 +116,25 @@ class AnnotationSample(db.Model):
         db.UniqueConstraint('user_number', 'sample_index', name='_user_sample_index_uc'),
     )
 
+def ensure_answer_notes_column():
+    """Ensure Answer.notes exists for deployments with older schemas."""
+    inspector = inspect(db.engine)
+    column_names = [column['name'] for column in inspector.get_columns('answer')]
+
+    if 'notes' in column_names:
+        return
+
+    logger.info("Adding missing 'notes' column to answer table")
+    db.session.execute(text('ALTER TABLE answer ADD COLUMN notes TEXT'))
+    db.session.commit()
+    logger.info("Successfully added 'notes' column to answer table")
+
 # Initialize database
 logger.info("Initializing database...")
 try:
     with app.app_context():
         db.create_all()
+        ensure_answer_notes_column()
         user_count = User.query.count()
         admin_count = User.query.filter_by(is_admin=True).count()
         logger.info(f"Database initialized successfully. Users: {user_count}, Admins: {admin_count}")
@@ -217,6 +232,7 @@ def login():
                 session['username'] = user.username
                 session['user_number'] = user.user_number
                 session['is_admin'] = user.is_admin
+                session['instructions_seen'] = bool(user.is_admin)
                 
                 logger.info(f"Login successful for user: {username} (ID: {user.id}, Admin: {user.is_admin})")
                 
@@ -252,20 +268,49 @@ def dashboard():
     # Redirect admin to admin dashboard
     if session.get('is_admin'):
         return redirect(url_for('admin_dashboard'))
+
+    if not session.get('instructions_seen'):
+        return redirect(url_for('instructions_page'))
     
     return redirect(url_for('annotate'))
+
+@app.route('/instructions', methods=['GET', 'POST'])
+def instructions_page():
+    """Show annotation instructions to users before they enter annotation."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if session.get('is_admin'):
+        return redirect(url_for('admin_dashboard'))
+
+    if request.method == 'POST':
+        session['instructions_seen'] = True
+        return redirect(url_for('annotate'))
+
+    return render_template(
+        'instructions_page.html',
+        username=session.get('username'),
+        help_text=load_instructions_text()
+    )
 
 @app.route('/annotate')
 def annotate():
     """Annotation page - display one sample at a time with pagination."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+
+    if not session.get('is_admin') and not session.get('instructions_seen'):
+        return redirect(url_for('instructions_page'))
     
     user_id = session.get('user_id')
     user_number = session.get('user_number')
     
     # Get current user to check their progress
     user = User.query.get(user_id)
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+
     current_index = user.current_index if user.current_index is not None else 0
     
     # Load user data
@@ -279,7 +324,7 @@ def annotate():
     
     # Get all answers for this user
     answers = Answer.query.filter_by(user_id=user_id).all()
-    answer_map = {ans.sample_index: ans.answer for ans in answers}
+    answer_map = {ans.sample_index: ans.answer for ans in answers if ans.answer in ['Yes', 'No']}
     
     return render_template('annotate.html', 
                          username=session.get('username'),
@@ -316,12 +361,18 @@ def get_sample(index):
         
         # Extract Predicted Proof Chain
         predicted_proof_chain = sample.get('Predicted_Proof_Chain', '')
+
+        # Load existing annotation row for answer/notes state
+        user_id = session.get('user_id')
+        answer_obj = Answer.query.filter_by(user_id=user_id, sample_index=index).first()
+        notes = answer_obj.notes if answer_obj else ''
         
         return jsonify({
             'index': index,
             'facts': facts,
             'query': query,
             'predicted_proof_chain': predicted_proof_chain,
+            'notes': notes or '',
             'total': len(user_data)
         })
     else:
@@ -348,16 +399,56 @@ def save_answer():
     if existing_answer:
         existing_answer.answer = answer
     else:
-        new_answer = Answer(user_id=user_id, sample_index=sample_index, answer=answer)
+        new_answer = Answer()
+        new_answer.user_id = user_id
+        new_answer.sample_index = sample_index
+        new_answer.answer = answer
         db.session.add(new_answer)
     
     # Update user's current index
     user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
     user.current_index = sample_index
     
     db.session.commit()
     
     return jsonify({'success': True, 'index': sample_index, 'answer': answer})
+
+@app.route('/api/save_notes', methods=['POST'])
+def save_notes():
+    """API endpoint to save optional user notes for a sample."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session.get('user_id')
+    data = request.get_json() or {}
+
+    sample_index = data.get('index')
+    notes = (data.get('notes') or '').strip()
+
+    if sample_index is None:
+        return jsonify({'error': 'Invalid data'}), 400
+
+    # Keep notes bounded to prevent oversized payloads from overwhelming storage/UI.
+    if len(notes) > 5000:
+        return jsonify({'error': 'Notes are too long (max 5000 characters).'}), 400
+
+    existing_answer = Answer.query.filter_by(user_id=user_id, sample_index=sample_index).first()
+
+    if existing_answer:
+        existing_answer.notes = notes
+    else:
+        new_answer = Answer()
+        new_answer.user_id = user_id
+        new_answer.sample_index = sample_index
+        new_answer.notes = notes
+        db.session.add(new_answer)
+
+    db.session.commit()
+
+    return jsonify({'success': True, 'index': sample_index, 'notes': notes})
 
 @app.route('/api/get_answer/<int:index>')
 def get_answer(index):
@@ -407,7 +498,10 @@ def admin_dashboard():
         # Get progress for each user
         user_progress = []
         for user in users:
-            answers_count = Answer.query.filter_by(user_id=user.id).count()
+            answers_count = Answer.query.filter(
+                Answer.user_id == user.id,
+                Answer.answer.in_(['Yes', 'No'])
+            ).count()
             user_data = get_user_data(user.user_number)
             total_samples = len(user_data) if user_data else 0
             
@@ -449,7 +543,7 @@ def admin_view_user(user_id):
         
         # Get all answers for this user
         answers = Answer.query.filter_by(user_id=user_id).all()
-        answer_map = {ans.sample_index: ans.answer for ans in answers}
+        answer_map = {ans.sample_index: ans.answer for ans in answers if ans.answer in ['Yes', 'No']}
         
         # Get user data
         user_data = get_user_data(user.user_number)
@@ -492,17 +586,20 @@ def admin_download_user_annotations(user_id):
             return "Cannot download admin user data", 403
 
         answers = Answer.query.filter_by(user_id=user_id).all()
-        answer_map = {ans.sample_index: ans.answer for ans in answers}
+        answer_map = {ans.sample_index: ans.answer for ans in answers if ans.answer in ['Yes', 'No']}
+        notes_map = {ans.sample_index: ans.notes for ans in answers}
         user_data = get_user_data(user.user_number)
 
         annotations = []
 
         for idx, sample in enumerate(user_data):
             answer = answer_map.get(idx, '')
+            notes = notes_map.get(idx, '') or ''
             status = 'answered' if answer else 'not_answered'
             annotations.append({
                 'sample_index': idx,
                 'answer': answer,
+                'notes': notes,
                 'status': status,
                 'sample': sample,
             })

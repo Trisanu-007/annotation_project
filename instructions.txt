@@ -1,9 +1,58 @@
 Instructions:
 
-Please make sure that you check the given Facts and Rules and check if the Predicted Proof Chain answers the Query.
+Check if the query is reachable by following the predicted proof chains.
 
-Make sure that:
-1. If the query is reachable by the predicted proof chain, mark "yes".
-2. Soft check if the predicted proof chain contains hallucinated chains. Even if it does, there is a possibility that the total proof chain does answer the given query. In that case mark "Yes".
-3. Make sure the Predicted Proof chain actually helps in answering the query.
-4. If the query is not reachable due to either mistakes in predicted proof chain or the proof chain itself does not lead to reaching the query or the proof chain contains statement like "cannot apply rule" which could imply the rule is not applicable, then answer "no"
+Note:
+1. If the proof chain contains certain implications which are not part of rules or which cannot be derived, but however they do not contribute to reaching the query, consider them as just noises.
+2. However if the proof chain contains certain implications which are not part of rules or which cannot be derived, and they are used to reach the query then they are hallucinations and in these cases the proof chain is made up and should not be used to reach the query (therefore it is recommended to mark them as 'No')
+3. Example:
+Facts: Alice is calm. Alice is sad. Alice is elegance. Alice is patience.
+Rules: calm => elegance; 
+elegance => patience;
+sad and patience => dark
+Query: Alice is dark.
+
+Predicted proof chain:
+calm and patience => beautiful
+sad and patience => dark.
+
+Answer is Yes because calm implies elegance; elegance implies patience; patience and patience implies beautiful
+Sad and patience is dark. Therefore, Alice is dark (yes)
+
+Predicted proof chain:
+calm => naughty
+calm => elegance; 
+elegance => patience;
+sad and patience => dark
+
+Answer is Yes. Although calm implies naughty is not part of the rule but still this is not used anywhere it can be treated as NOISE and ignored and the query is reachable by other valid rules and implications.
+
+Predicted proof chain:
+calm => naughty
+naughty => elegance; 
+elegance => patience;
+patience => beautiful;
+sad and patience => dark
+
+Answer is No. Calm implies naughty is a made up rule and it is used downstream to derive the query. Therefore it is not a valid proof to reach the query. The answer should be No.
+
+
+Facts:  
+Alice is tender.
+Alice is lonely .
+Alice is average .
+Alice is reserved .
+
+Rules:
+sleepy ^ cute => frail .
+frail ^ reserved ^ friendly => nervous .
+friendly ^ clean ^ stormy => cruel .
+stormy => agreeable .
+difficult ^ friendly ^ average => thoughtful .
+
+Query: Alice is nervous.
+
+Prdicted Proof Chain:
+Cannot apply rule frail ∧ reserved ∧ friendly ⇒ nervous because missing: frail, friendly.
+
+Answer is No. Because the predicted proof chain itself says cannot apply rules and it cannot reach the query.
