@@ -489,6 +489,14 @@
             opacity: 1;
         }
 
+        .rules-scroll-content {
+            max-height: 320px;
+            overflow-y: auto;
+            overflow-x: auto;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
         .rules-content[hidden] {
             max-height: 0;
             opacity: 0;
@@ -650,28 +658,28 @@
                     content.innerHTML = `
                         <div class="section">
                             <div class="section-title">Facts</div>
-                            <div class="section-content">${formatText(initialFacts, true)}</div>
+                            <div class="section-content rules-scroll-content">${formatText(initialFacts, true)}</div>
                         </div>
                         
                         <div class="proof-layout">
                             <div class="section rules-dropdown">
                                 <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Rules</button>
                                 <div class="rules-content" hidden>
-                                    <div class="section-content">${formatText(rules)}</div>
+                                    <div class="section-content rules-scroll-content">${formatText(rules)}</div>
                                 </div>
                             </div>
 
                             <div class="section rules-dropdown">
                                 <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Predicted Proof Chain</button>
                                 <div class="rules-content" hidden>
-                                    <div class="section-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
+                                    <div class="section-content rules-scroll-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="section">
                             <div class="section-title">Query</div>
-                            <div class="section-content query-content">${formatText(data.query)}</div>
+                            <div class="section-content query-content rules-scroll-content">${formatText(data.query)}</div>
                         </div>
                         
                         <div class="answer-section">
