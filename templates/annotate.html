@@ -483,7 +483,7 @@
         }
 
         .rules-content {
-            max-height: 500px;
+            max-height: 640px;
             overflow: hidden;
             transition: all 0.3s ease-in-out;
             opacity: 1;
@@ -495,6 +495,10 @@
             overflow-x: auto;
             word-break: break-word;
             overflow-wrap: anywhere;
+        }
+
+        .proof-scroll-content {
+            max-height: 560px;
         }
 
         .rules-content[hidden] {
@@ -665,14 +669,14 @@
                             <div class="section rules-dropdown">
                                 <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Rules</button>
                                 <div class="rules-content" hidden>
-                                    <div class="section-content rules-scroll-content">${formatText(rules)}</div>
+                                    <div class="section-content rules-scroll-content proof-scroll-content">${formatText(rules)}</div>
                                 </div>
                             </div>
 
                             <div class="section rules-dropdown">
                                 <button class="rules-toggle" onclick="toggleRules(this)" aria-expanded="false">Predicted Proof Chain</button>
                                 <div class="rules-content" hidden>
-                                    <div class="section-content rules-scroll-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
+                                    <div class="section-content rules-scroll-content proof-scroll-content">${escapeHtml(data.predicted_proof_chain || 'N/A')}</div>
                                 </div>
                             </div>
                         </div>
@@ -713,7 +717,7 @@
                                     ← Previous
                                 </button>
                                 <div class="keyboard-hint">
-                                    Use ← → arrow keys to navigate • Y/N keys to answer
+                                    Use ← → arrow keys to navigate
                                 </div>
                                 ${index >= totalSamples - 1 ?
                                     '<button class="nav-btn" onclick="finishAnnotation()" style="background: #28a745; cursor: pointer;">Finished Annotation !!</button>' :
@@ -921,10 +925,6 @@
                 previousSample();
             } else if (e.key === 'ArrowRight') {
                 nextSample();
-            } else if (e.key.toLowerCase() === 'y') {
-                selectAnswer('Yes');
-            } else if (e.key.toLowerCase() === 'n') {
-                selectAnswer('No');
             }
         });
         
