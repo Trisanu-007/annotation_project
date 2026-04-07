@@ -4,38 +4,82 @@ Check if the query is reachable by following the predicted proof chains.
 
 Note:
 1. If the proof chain contains certain implications which are not part of rules or which cannot be derived, but however they do not contribute to reaching the query, consider them as just noises.
+
 2. However if the proof chain contains certain implications which are not part of rules or which cannot be derived, and they are used to reach the query then they are hallucinations and in these cases the proof chain is made up and should not be used to reach the query (therefore it is recommended to mark them as 'No')
+
 3. Example:
-Facts: Alice is calm. Alice is sad. Alice is elegance. Alice is patience.
-Rules: calm => elegance; 
+Facts: 
+Alice is calm. 
+Alice is sad. 
+Alice is elegance. 
+Alice is patience.
+Alice is naughty.
+
+Rules: 
+calm => elegance; 
 elegance => patience;
 sad and patience => dark
+
 Query: Alice is dark.
 
 Predicted proof chain:
 calm and patience => beautiful
 sad and patience => dark.
 
-Answer is Yes because calm implies elegance; elegance implies patience; patience and patience implies beautiful
+Answer is Yes: because calm implies elegance; elegance implies patience; patience and patience implies beautiful is right.
 Sad and patience is dark. Therefore, Alice is dark (yes)
+
+--------------------------------------------------------------------------------------------------------------------
+
+Facts: 
+Alice is calm. 
+Alice is sad. 
+Alice is elegance. 
+Alice is patience. 
+Alice is naughty.
+
+Rules: 
+calm => elegance; 
+elegance => patience;
+patience => beautiful
+
+Query: Alice is beautiful.
+
 
 Predicted proof chain:
 calm => naughty
 calm => elegance; 
 elegance => patience;
+patience => beautiful
+
+Answer is Yes. Although calm implies naughty cannot be derived but still this is not used downstream to derive the query, 
+it can be treated as NOISE and ignored and the query is reachable by other valid rules and implications.
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+Facts: 
+Alice is calm. 
+Alice is sad. 
+Alice is elegance. 
+Alice is patience. 
+Alice is naughty.
+
+Rules: 
+calm => elegance; 
+elegance => patience;
+patience => beautiful
 sad and patience => dark
 
-Answer is Yes. Although calm implies naughty is not part of the rule but still this is not used anywhere it can be treated as NOISE and ignored and the query is reachable by other valid rules and implications.
+Query: Alice is beautiful.
 
 Predicted proof chain:
 calm => naughty
-naughty => elegance; 
-elegance => patience;
-patience => beautiful;
-sad and patience => dark
+naughty => beautiful
 
-Answer is No. Calm implies naughty is a made up rule and it is used downstream to derive the query. Therefore it is not a valid proof to reach the query. The answer should be No.
+Answer is No. Since calm implies naughty is a false statement and cannot be implied but is used downstream 
+to derive Alice is beautiful, the predicetd proof chain does not lead to answering the query.
 
+------------------------------------------------------------------------------------------------------------------------
 
 Facts:  
 Alice is tender.
@@ -55,4 +99,13 @@ Query: Alice is nervous.
 Prdicted Proof Chain:
 Cannot apply rule frail ∧ reserved ∧ friendly ⇒ nervous because missing: frail, friendly.
 
-Answer is No. Because the predicted proof chain itself says cannot apply rules and it cannot reach the query.
+Answer is No. Although the predicted proof chain is valid, the proof chain cannot be used to reach the query, since proof 
+chain contains certain implications where the rule cannot be applied due to missing frail, friendly.
+
+------------------------------------------------------------------------------------------------------------------------
+
+
+Only if query is reachable and the proof chain leads to query, mark answer as "Yes".
+If proof chain is valid but does not lead to query being answered, for example: last case, mark it as "No".
+Also make sure that any non-noisy rule part of predicted proof chain is valid. Sometimes, it could be present 
+in the rules but might not be actually derivable, in which case, answer should be marked as "No".
